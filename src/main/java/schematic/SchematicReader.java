@@ -11,6 +11,7 @@ import java.util.zip.GZIPInputStream;
 
 import com.mojang.datafixers.DataFixer;
 import com.mojang.serialization.Dynamic;
+import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.SharedConstants;
 import net.minecraft.datafixer.TypeReferences;
@@ -31,22 +32,20 @@ public final class SchematicReader {
 	 */
 	public static void accept(Path path, SchematicVisitor visitor) throws IOException, SchematicReadException {
 		try (InputStream pathStream = Files.newInputStream(path)) {
-			try (GZIPInputStream gzipInputStream = new GZIPInputStream(pathStream)) {
-				final CompoundTag tag = NbtIo.readCompressed(gzipInputStream);
+			final CompoundTag tag = NbtIo.readCompressed(pathStream);
 
-				// This field is constant no matter the version
-				final int version = SchematicReader.getIntOrThrow(tag, "Version");
+			// This field is constant no matter the version
+			final int version = SchematicReader.getIntOrThrow(tag, "Version");
 
-				switch (version) {
-				case 1:
-					acceptV1(tag, visitor);
-					break;
-				case 2:
-					acceptV2(tag, visitor);
-					break;
-				default:
-					throw new SchematicReadException(); // TODO: Describe error
-				}
+			switch (version) {
+			case 1:
+				acceptV1(tag, visitor);
+				break;
+			case 2:
+				acceptV2(tag, visitor);
+				break;
+			default:
+				throw new SchematicReadException(); // TODO: Describe error
 			}
 		}
 	}
@@ -144,7 +143,7 @@ public final class SchematicReader {
 		int yOffset = 0;
 		int zOffset = 0;
 
-		if (tag.contains("Offset" ,NbtType.INT_ARRAY)) {
+		if (tag.contains("Offset", NbtType.INT_ARRAY)) {
 			final int[] offsets = tag.getIntArray("Offset");
 
 			// Ignore offset if any of the array entries are missing
@@ -161,9 +160,9 @@ public final class SchematicReader {
 	private static SchematicMetadata readV2Metadata(CompoundTag tag) {
 		if (tag.contains("Metadata", NbtType.COMPOUND)) {
 			final CompoundTag metadataTag = tag.getCompound("Metadata");
-			/* @Nullable */ String name = null;
-			/* @Nullable */ String author = null;
-			/* @Nullable */ Instant date = null;
+			@Nullable String name = null;
+			@Nullable String author = null;
+			@Nullable Instant date = null;
 			final List<String> requiredMods = new ArrayList<>();
 
 			if (metadataTag.contains("Name", NbtType.STRING)) {

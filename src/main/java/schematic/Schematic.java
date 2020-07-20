@@ -150,7 +150,8 @@ public final class Schematic implements SchematicVisitor {
 
 	@Override
 	public BiomePaletteVisitor visitBiomePalette(int size) {
-		return null; // TODO: Implement
+		this.biomePalette.clear(); // Prepare the palette
+		return new BiomePaletteVisitorImpl();
 	}
 
 	@Override
