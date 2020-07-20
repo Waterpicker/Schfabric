@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "schfabric-testmod",
+  "version": "0.0.1",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "schematic.test.SchematicTests"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.7.4",
+    "schfabric": "*"
+  }
+}

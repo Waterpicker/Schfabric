@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "schfabric",
+  "version": "${version}",
+  "name": "TODO",
+  "description": "TODO",
+  "authors": [
+  ],
+  "contact": {
+    "homepage": "https://fabricmc.net/",
+    "sources": "https://github.com/FabricMC/fabric-example-mod"
+  },
+  "license": "MIT",
+  "icon": "assets/schfabric/icon.png",
+  "environment": "*",
+  "depends": {
+    "fabricloader": ">=0.7.4"
+  }
+}
