@@ -9,8 +9,7 @@ final class SchematicBlockStateReader {
 	private final Map<String, String> properties;
 
 	SchematicBlockStateReader(String id) {
-		this.id = id;
-		this.properties = Collections.emptyMap();
+		this(id, Collections.emptyMap());
 	}
 
 	SchematicBlockStateReader(String id, Map<String, String> properties) {
@@ -31,7 +30,7 @@ final class SchematicBlockStateReader {
 			// Pop the "]" off the end of the string
 			final String propertiesString = split[1].substring(0, split[1].length() - 1);
 
-			// split at "," to seperate each property key + value
+			// split at "," to separate each property key + value
 			for (String propertyKeyValue : propertiesString.split(",")) {
 				// "=" splits key and value
 				final String[] keyValue = propertyKeyValue.split("=");

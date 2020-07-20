@@ -1,17 +1,22 @@
 package schematic;
 
+import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.DoubleTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.util.Identifier;
 
 final class SchematicBlockEntityImpl implements SchematicBlockEntity {
+	private final SchematicInfo info;
 	private final int x;
 	private final int y;
 	private final int z;
 	private final Identifier id;
 	private final CompoundTag extraData;
 
-	SchematicBlockEntityImpl(int x, int y, int z, String id, CompoundTag extraData) {
+	SchematicBlockEntityImpl(SchematicInfo info, int x, int y, int z, String id, CompoundTag extraData) {
+		this.info = info;
 		this.x = x;
 		this.y = y;
 		this.z = z;
@@ -40,8 +45,18 @@ final class SchematicBlockEntityImpl implements SchematicBlockEntity {
 	}
 
 	@Override
-	public BlockEntity createBlockEntity() {
-		throw new UnimplementedException("SchematicBlockEntityImpl", "createBlockEntity");
+	public BlockEntity createBlockEntity(BlockState state, int x, int y, int z) {
+		// Copy the extra data and write the id and real position to the block entity.
+		final CompoundTag blockEntityTag = this.getExtraData();
+
+		// Apply position of real block entity
+		blockEntityTag.putInt("x", this.info.getWidth() + this.info.getXOffset() + this.getRelativeX() + x);
+		blockEntityTag.putInt("y", this.info.getHeight() + this.info.getYOffset() + this.getRelativeY() + y);
+		blockEntityTag.putInt("z", this.info.getLength() + this.info.getZOffset() + this.getRelativeZ() + z);
+
+		blockEntityTag.putString("id", this.id.toString());
+
+		return BlockEntity.createFromTag(state, blockEntityTag);
 	}
 
 	@Override

@@ -56,7 +56,9 @@ public final class SchematicReader {
 	}
 
 	private static void acceptV2(CompoundTag tag, SchematicVisitor visitor) throws SchematicReadException {
-		visitor.visitInfo(SchematicReader.readV2Info(tag));
+		visitor.visitVersion(Schematic.Version.TWO);
+		final SchematicInfo schematicInfo = SchematicReader.readV2Info(tag);
+		visitor.visitInfo(schematicInfo);
 		visitor.visitMetadata(SchematicReader.readV2Metadata(tag));
 
 		// Block palette
@@ -68,11 +70,14 @@ public final class SchematicReader {
 
 		if (tag.contains("Palette", NbtType.COMPOUND)) {
 			final SchematicVisitor.BlockPaletteVisitor paletteVisitor = visitor.visitBlockPalette(paletteMax);
-			final CompoundTag palette = tag.getCompound("Palette");
 
-			for (String key : palette.getKeys()) {
-				final SchematicBlockStateReader reader = SchematicBlockStateReader.read(key);
-				paletteVisitor.visitBlockEntry(reader.getId(), reader.getProperties(), palette.getInt(key));
+			if (paletteVisitor != null) {
+				final CompoundTag palette = tag.getCompound("Palette");
+
+				for (String key : palette.getKeys()) {
+					final SchematicBlockStateReader reader = SchematicBlockStateReader.read(key);
+					paletteVisitor.visitBlockEntry(reader.getId(), reader.getProperties(), palette.getInt(key));
+				}
 			}
 		}
 
@@ -85,38 +90,46 @@ public final class SchematicReader {
 
 		if (tag.contains("BiomePalette", NbtType.COMPOUND)) {
 			final SchematicVisitor.BiomePaletteVisitor paletteVisitor = visitor.visitBiomePalette(biomePaletteMax);
-			final CompoundTag palette = tag.getCompound("BiomePalette");
 
-			for (String key : palette.getKeys()) {
-				paletteVisitor.visitBiome(key, palette.getInt(key));
+			// Only visit if the provided visitor is not null
+			if (paletteVisitor != null) {
+				final CompoundTag palette = tag.getCompound("BiomePalette");
+
+				for (String key : palette.getKeys()) {
+					paletteVisitor.visitBiome(key, palette.getInt(key));
+				}
 			}
 		}
 
+		// Blocks
 		if (tag.contains("BlockData", NbtType.BYTE_ARRAY)) {
 			final byte[] blockData = tag.getByteArray("BlockData");
 			visitor.visitBlockData(blockData);
 		}
 
+		// Biomes
 		if (tag.contains("BiomeData", NbtType.BYTE_ARRAY)) {
 			final byte[] biomeData = tag.getByteArray("BiomeData");
 			visitor.visitBiomeData(biomeData);
 		}
 
+		// BlockEntities
 		if (tag.contains("BlockEntities", NbtType.LIST)) {
 			final ListTag blockEntities = tag.getList("BlockEntities", NbtType.COMPOUND);
 
 			for (int i = 0; i < blockEntities.size(); i++) {
 				final CompoundTag blockEntityTag = blockEntities.getCompound(i);
-
-				SchematicReader.readV2BlockEntity(blockEntityTag);
+				visitor.visitBlockEntity(SchematicReader.readV2BlockEntity(schematicInfo, blockEntityTag));
 			}
 		}
 
+		// Entities
 		if (tag.contains("Entities", NbtType.LIST)) {
 			final ListTag entities = tag.getList("Entities", NbtType.COMPOUND);
 
 			for (int i = 0; i < entities.size(); i++) {
 				final CompoundTag entityTag = entities.getCompound(i);
+				visitor.visitEntity(SchematicReader.readV2Entity(schematicInfo, entityTag));
 			}
 		}
 	}
@@ -142,7 +155,7 @@ public final class SchematicReader {
 			}
 		}
 
-		return new SchematicInfoImpl(Schematic.Version.TWO, dataVersion, width, height, length, xOffset, yOffset, zOffset);
+		return new SchematicInfoImpl(dataVersion, width, height, length, xOffset, yOffset, zOffset);
 	}
 
 	private static SchematicMetadata readV2Metadata(CompoundTag tag) {
@@ -179,7 +192,7 @@ public final class SchematicReader {
 		return EmptySchematicMetadata.INSTANCE;
 	}
 
-	private static SchematicBlockEntity readV2BlockEntity(CompoundTag blockEntityTag) throws SchematicReadException {
+	private static SchematicBlockEntity readV2BlockEntity(SchematicInfo info, CompoundTag blockEntityTag) throws SchematicReadException {
 		if (!blockEntityTag.contains("Pos", NbtType.INT_ARRAY)) {
 			throw new SchematicReadException();
 		}
@@ -199,7 +212,35 @@ public final class SchematicReader {
 		final String id = blockEntityTag.getString("Id");
 		blockEntityTag.remove("Id");
 
-		return new SchematicBlockEntityImpl(pos[0], pos[1], pos[2], id, blockEntityTag);
+		return new SchematicBlockEntityImpl(info, pos[0], pos[1], pos[2], id, blockEntityTag);
+	}
+
+	private static SchematicEntity readV2Entity(SchematicInfo info, CompoundTag entityTag) throws SchematicReadException {
+		if (!entityTag.contains("Pos", NbtType.LIST)) {
+			throw new SchematicReadException();
+		}
+
+		final ListTag posTag = entityTag.getList("Pos", NbtType.DOUBLE);
+
+		if (posTag.size() != 3) {
+			throw new SchematicReadException();
+		}
+
+		final double[] pos = new double[3];
+		pos[0] = posTag.getDouble(0);
+		pos[1] = posTag.getDouble(1);
+		pos[2] = posTag.getDouble(2);
+
+		entityTag.remove("Pos");
+
+		if (!entityTag.contains("Id", NbtType.STRING)) {
+			throw new SchematicReadException();
+		}
+
+		final String id = entityTag.getString("Id");
+		entityTag.remove("Id");
+
+		return new SchematicEntityImpl(info, pos[0], pos[1], pos[2], id, entityTag);
 	}
 
 	private static int getIntOrThrow(CompoundTag tag, String key) throws SchematicReadException {

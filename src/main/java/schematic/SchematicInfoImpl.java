@@ -1,12 +1,10 @@
 package schematic;
 
 final class SchematicInfoImpl implements SchematicInfo {
-	private final Schematic.Version version;
 	private final short width, height, length;
 	private final int dataVersion, xOffset, yOffset, zOffset;
 
-	SchematicInfoImpl(Schematic.Version version, int dataVersion, short width, short height, short length, int xOffset, int yOffset, int zOffset) {
-		this.version = version;
+	SchematicInfoImpl(int dataVersion, short width, short height, short length, int xOffset, int yOffset, int zOffset) {
 		this.dataVersion = dataVersion;
 		this.width = width;
 		this.height = height;
@@ -14,11 +12,6 @@ final class SchematicInfoImpl implements SchematicInfo {
 		this.xOffset = xOffset;
 		this.yOffset = yOffset;
 		this.zOffset = zOffset;
-	}
-
-	@Override
-	public Schematic.Version getVersion() {
-		return this.version;
 	}
 
 	@Override

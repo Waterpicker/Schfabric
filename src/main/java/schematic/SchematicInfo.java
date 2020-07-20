@@ -5,13 +5,6 @@ package schematic;
  */
 public interface SchematicInfo {
 	/**
-	 * Gets the version of the schematic format.
-	 *
-	 * @return the version of the schematic
-	 */
-	Schematic.Version getVersion();
-
-	/**
 	 * Gets the data version of Minecraft used to create the schematic.
 	 *
 	 * @return the data version this schematic was created on.

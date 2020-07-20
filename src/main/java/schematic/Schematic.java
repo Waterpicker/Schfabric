@@ -17,20 +17,23 @@ import net.minecraft.datafixer.NbtOps;
 import net.minecraft.datafixer.Schemas;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtHelper;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.collection.Int2ObjectBiMap;
+import net.minecraft.util.registry.BuiltinRegistries;
 import net.minecraft.world.biome.Biome;
 
 public final class Schematic implements SchematicVisitor {
+	private Version version;
 	private SchematicInfo info;
 	private SchematicMetadata metadata = EmptySchematicMetadata.INSTANCE;
 	private byte[] blockData = new byte[0];
 	private Int2ObjectBiMap<BlockState> blockPalette = new Int2ObjectBiMap<>(64); // Allocate a sane default for now
+	private List<SchematicBlockEntity> blockEntities = new ArrayList<>();
+
+	// Version 2 additions
 	private byte[] biomeData = new byte[0];
 	private Int2ObjectBiMap<Biome> biomePalette = new Int2ObjectBiMap<>(64); // Allocate a sane default for now
-	private List<SchematicBlockEntity> blockEntities = new ArrayList<>();
-	/**
-	 * Entities in this schematic. Only supported in {@link Version#TWO}.
-	 */
+
 	private List<SchematicEntity> entities = new ArrayList<>();
 
 	public static Schematic create(Schematic.Version version) {
@@ -57,6 +60,11 @@ public final class Schematic implements SchematicVisitor {
 	}
 
 	private Schematic(Version version) {
+		this.version = version;
+	}
+
+	public Schematic.Version getVersion() {
+		return this.version;
 	}
 
 	public SchematicInfo getInfo() {
@@ -69,14 +77,21 @@ public final class Schematic implements SchematicVisitor {
 
 	public BlockState getBlockState(int x, int y, int z) {
 		this.validateLocation(x, y, z);
-		final byte blockDatum = this.blockData[this.wrapLocation(x, y, z)];
+		final byte blockDatum = this.blockData[this.wrap3DLocation(x, y, z)];
 
 		return this.blockPalette.get(blockDatum);
 	}
 
 	public Biome getBiome(int x, int z) {
-		// TODO: Wrap location and apply to palette
-		return null;
+		if (this.supports(Capability.BIOMES)) {
+			// Version 2 does not support 3d biomes. That will likely be in version 3
+			this.validateLocation(x, 0, z);
+			final byte biomeDatum = this.biomeData[this.wrap2DLocation(x, z)];
+
+			return this.biomePalette.get(biomeDatum);
+		}
+
+		throw new UnsupportedOperationException("Biomes are not supported in this schematic!");
 	}
 
 	public List<SchematicEntity> getEntities() {
@@ -92,10 +107,15 @@ public final class Schematic implements SchematicVisitor {
 	}
 
 	public boolean supports(Capability capability) {
-		return this.info.getVersion().supports(capability);
+		return this.version.supports(capability);
 	}
 
 	// VISITOR IMPLEMENTATION
+
+	@Override
+	public void visitVersion(Version version) {
+		this.version = version;
+	}
 
 	@Override
 	public void visitInfo(SchematicInfo info) {
@@ -114,13 +134,13 @@ public final class Schematic implements SchematicVisitor {
 
 	@Override
 	public void visitEntity(SchematicEntity entity) {
-		// TODO: Verify version of schematic before visiting any entity
 		this.entities.add(entity);
 	}
 
 	@Override
 	public BlockPaletteVisitor visitBlockPalette(int size) {
-		return null;
+		this.blockPalette.clear(); // Prepare the palette
+		return new BlockPaletteVisitorImpl();
 	}
 
 	@Override
@@ -137,6 +157,8 @@ public final class Schematic implements SchematicVisitor {
 	public void visitBiomeData(byte[] biomeData) {
 		this.biomeData = biomeData;
 	}
+
+	// Util Methods
 
 	// TODO: Explain each error
 	private void validateLocation(int x, int y, int z) {
@@ -155,29 +177,31 @@ public final class Schematic implements SchematicVisitor {
 		}
 	}
 
-	private int wrapLocation(int x, int y, int z) {
+	private int wrap3DLocation(int x, int y, int z) {
 		// x + (z * Width) + (y * Width * Length)
 		return x + ((z) * this.info.getWidth()) + (y * this.info.getWidth() * this.info.getLength());
 	}
 
+	private int wrap2DLocation(int x, int z) {
+		// x + (z * Width)
+		return x + (z * this.info.getWidth());
+	}
+
 	public enum Version {
-		ONE(
-			1,
-			Capability.BLOCK_ENTITIES
-		),
-		TWO(
-			2,
-			Capability.BLOCK_ENTITIES,
-			Capability.ENTITIES,
-			Capability.BIOMES
-		);
+		ONE(1),
+		TWO(2, Capability.ENTITIES, Capability.BIOMES);
 
 		private final int version;
 		private final EnumSet<Capability> capabilities;
 
 		Version(int version, Capability... capabilities) {
 			this.version = version;
-			this.capabilities = EnumSet.copyOf(Arrays.asList(capabilities));
+
+			if (capabilities.length == 0) {
+				this.capabilities = EnumSet.noneOf(Capability.class);
+			} else {
+				this.capabilities = EnumSet.copyOf(Arrays.asList(capabilities));
+			}
 		}
 
 		public boolean supports(Capability capability) {
@@ -191,17 +215,17 @@ public final class Schematic implements SchematicVisitor {
 
 	public enum Capability {
 		/**
-		 * The schematic supports block entities.
-		 */
-		BLOCK_ENTITIES,
-		/**
 		 * The schematic supports entities.
+		 *
+		 * <p>Added by version two of the schematic specification.
 		 */
 		ENTITIES,
 		/**
 		 * The schematic supports biomes.
+		 *
+		 * <p>Added by version two of the schematic specification.
 		 */
-		BIOMES
+		BIOMES;
 	}
 
 	private class BlockPaletteVisitorImpl implements BlockPaletteVisitor {
@@ -219,7 +243,7 @@ public final class Schematic implements SchematicVisitor {
 
 			tag.put("Properties", propertiesTag);
 
-			// Data fix the block state to latest
+			// Data fix the block state to latest version
 			final CompoundTag fixedState = (CompoundTag) SchematicReader.fixBlockState(Schemas.getFixer(), new Dynamic<>(NbtOps.INSTANCE, tag), Schematic.this.getInfo().getDataVersion()).getValue();
 			Schematic.this.blockPalette.put(NbtHelper.toBlockState(fixedState), id);
 		}
@@ -228,7 +252,8 @@ public final class Schematic implements SchematicVisitor {
 	private class BiomePaletteVisitorImpl implements BiomePaletteVisitor {
 		@Override
 		public void visitBiome(String registryId, int id) {
-			// TODO:
+			// TODO: Data fix biome names
+			Schematic.this.biomePalette.put(BuiltinRegistries.BIOME.get(new Identifier(registryId)), id);
 		}
 	}
 }
